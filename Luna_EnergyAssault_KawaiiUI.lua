@@ -1,158 +1,117 @@
 
--- 🌸 LunaSilent v2.0 for Energy Assault (Xeno Compatible)
+-- LunaSilent v3.0 Hi-Tech UI
 -- Автор: Кира 💗
 
--- Настройки
+-- 🌐 Конфигурация
 local config = {
     fov = 80,
-    aimBind = Enum.UserInputType.MouseButton2, -- ПКМ
-    teamCheck = true,
-    deadCheck = true,
-    wallCheck = true,
+    aimKey = Enum.UserInputType.MouseButton2,
     silentAim = true,
+    triggerBot = true,
+    noSpread = true,
     glowESP = true,
-    glowColor = Color3.fromRGB(255, 150, 255),
-    outlineColor = Color3.fromRGB(255, 255, 255)
+    teamCheck = true,
+    wallCheck = true,
+    deadCheck = true
 }
 
--- Службы
+-- 🔌 Службы
 local plr = game.Players.LocalPlayer
 local mouse = plr:GetMouse()
 local cam = workspace.CurrentCamera
 local rs = game:GetService("RunService")
 local uis = game:GetService("UserInputService")
+local input = false
 
--- UI
-local ui = Instance.new("ScreenGui", game.CoreGui)
-ui.Name = "LunaSilentUI"
-local frame = Instance.new("Frame", ui)
-frame.Size = UDim2.new(0, 350, 0, 270)
-frame.Position = UDim2.new(0.65, 0, 0.2, 0)
-frame.BackgroundColor3 = Color3.fromRGB(245, 215, 255)
-frame.Active = true
-frame.Draggable = true
-frame.BorderSizePixel = 0
+-- 🖼️ UI Setup
+local gui = Instance.new("ScreenGui", game.CoreGui)
+gui.Name = "LunaSilentUI"
 
-local title = Instance.new("TextLabel", frame)
-title.Size = UDim2.new(1, 0, 0, 30)
-title.Text = "🌸 LunaSilent v2.0"
-title.BackgroundColor3 = Color3.fromRGB(255, 180, 255)
-title.TextColor3 = Color3.new(1,1,1)
-title.Font = Enum.Font.GothamBold
-title.TextSize = 20
+local main = Instance.new("Frame", gui)
+main.Size = UDim2.new(0, 430, 0, 330)
+main.Position = UDim2.new(0.3, 0, 0.2, 0)
+main.BackgroundColor3 = Color3.fromRGB(30,30,35)
+main.BorderSizePixel = 0
+main.Active = true
+main.Draggable = true
 
--- Кнопки
-local function makeToggle(name, y, default, callback)
-    local btn = Instance.new("TextButton", frame)
-    btn.Position = UDim2.new(0, 10, 0, y)
-    btn.Size = UDim2.new(0, 330, 0, 30)
-    btn.BackgroundColor3 = Color3.fromRGB(255, 200, 255)
-    btn.Text = (default and "[ON] " or "[OFF] ") .. name
+local topBar = Instance.new("TextLabel", main)
+topBar.Text = "LunaSilent v3.0"
+topBar.Size = UDim2.new(1, 0, 0, 35)
+topBar.BackgroundColor3 = Color3.fromRGB(90, 30, 120)
+topBar.TextColor3 = Color3.fromRGB(255, 255, 255)
+topBar.Font = Enum.Font.GothamBold
+topBar.TextSize = 20
+
+local function makeTab(name, pos)
+    local btn = Instance.new("TextButton", main)
+    btn.Size = UDim2.new(0, 100, 0, 30)
+    btn.Position = UDim2.new(0, 10 + pos*110, 0, 40)
+    btn.Text = name
+    btn.BackgroundColor3 = Color3.fromRGB(40,40,45)
     btn.TextColor3 = Color3.new(1,1,1)
-    btn.Font = Enum.Font.Cartoon
-    btn.TextSize = 16
+    btn.Font = Enum.Font.GothamSemibold
+    btn.TextSize = 14
+    return btn
+end
+
+local tabAimbot = makeTab("Aimbot", 0)
+local tabESP = makeTab("ESP", 1)
+local tabMisc = makeTab("Misc", 2)
+
+local pages = {}
+for _, tabName in ipairs({"Aimbot", "ESP", "Misc"}) do
+    local page = Instance.new("Frame", main)
+    page.Name = tabName
+    page.Size = UDim2.new(1, -20, 1, -80)
+    page.Position = UDim2.new(0, 10, 0, 75)
+    page.BackgroundColor3 = Color3.fromRGB(35,35,40)
+    page.Visible = false
+    pages[tabName] = page
+end
+pages["Aimbot"].Visible = true
+
+local function toggleButton(parent, name, default, callback)
+    local btn = Instance.new("TextButton", parent)
+    btn.Size = UDim2.new(0, 180, 0, 30)
+    btn.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 14
     local state = default
+    btn.Text = name .. ": " .. (state and "ON" or "OFF")
     btn.MouseButton1Click:Connect(function()
         state = not state
-        btn.Text = (state and "[ON] " or "[OFF] ") .. name
+        btn.Text = name .. ": " .. (state and "ON" or "OFF")
         callback(state)
     end)
 end
 
--- Aimbot функции
-local aiming = false
-
-local function isAlive(p)
-    local h = p.Character and p.Character:FindFirstChildWhichIsA("Humanoid")
-    return h and h.Health > 0
-end
-
-local function isVisible(pos)
-    local ray = Ray.new(cam.CFrame.Position, (pos - cam.CFrame.Position).Unit * 999)
-    local hit = workspace:FindPartOnRayWithIgnoreList(ray, {plr.Character})
-    return not hit or hit.Transparency > 0.3
-end
-
-local function getTarget()
-    local closest, dist = nil, config.fov
-    for _, v in pairs(game.Players:GetPlayers()) do
-        if v ~= plr and v.Character and v.Character:FindFirstChild("Head") then
-            if config.teamCheck and v.Team == plr.Team then continue end
-            if config.deadCheck and not isAlive(v) then continue end
-            local pos, onScreen = cam:WorldToViewportPoint(v.Character.Head.Position)
-            if onScreen then
-                local mag = (Vector2.new(pos.X, pos.Y) - Vector2.new(mouse.X, mouse.Y)).Magnitude
-                if mag < dist and (not config.wallCheck or isVisible(v.Character.Head.Position)) then
-                    closest, dist = v, mag
-                end
-            end
-        end
-    end
-    return closest
-end
-
--- Silent Aim Hook
-local mt = getrawmetatable(game)
-setreadonly(mt, false)
-local oldNamecall = mt.__namecall
-mt.__namecall = newcclosure(function(self, ...)
-    local args = {...}
-    local method = getnamecallmethod()
-    if config.silentAim and aiming and method == "FindPartOnRayWithIgnoreList" then
-        local target = getTarget()
-        if target and target.Character and target.Character:FindFirstChild("Head") then
-            local head = target.Character.Head.Position
-            args[1] = Ray.new(cam.CFrame.Position, (head - cam.CFrame.Position).Unit * 999)
-            return oldNamecall(self, unpack(args))
-        end
-    end
-    return oldNamecall(self, ...)
+-- 🧠 Функции переключения вкладок
+tabAimbot.MouseButton1Click:Connect(function()
+    for n, f in pairs(pages) do f.Visible = false end
+    pages["Aimbot"].Visible = true
+end)
+tabESP.MouseButton1Click:Connect(function()
+    for n, f in pairs(pages) do f.Visible = false end
+    pages["ESP"].Visible = true
+end)
+tabMisc.MouseButton1Click:Connect(function()
+    for n, f in pairs(pages) do f.Visible = false end
+    pages["Misc"].Visible = true
 end)
 
--- Ввод
-uis.InputBegan:Connect(function(i)
-    if i.UserInputType == config.aimBind then aiming = true end
-end)
-uis.InputEnded:Connect(function(i)
-    if i.UserInputType == config.aimBind then aiming = false end
-end)
+-- ⚙️ Кнопки в Aimbot
+toggleButton(pages["Aimbot"], "Silent Aim", config.silentAim, function(v) config.silentAim = v end).Position = UDim2.new(0, 10, 0, 10)
+toggleButton(pages["Aimbot"], "Team Check", config.teamCheck, function(v) config.teamCheck = v end).Position = UDim2.new(0, 10, 0, 50)
+toggleButton(pages["Aimbot"], "Wall Check", config.wallCheck, function(v) config.wallCheck = v end).Position = UDim2.new(0, 10, 0, 90)
 
--- Glow ESP
-if config.glowESP then
-    for _, player in ipairs(game.Players:GetPlayers()) do
-        if player ~= plr and player.Team ~= plr.Team then
-            local chr = player.Character or player.CharacterAdded:Wait()
-            for _, part in pairs(chr:GetChildren()) do
-                if part:IsA("BasePart") then
-                    local glow = Instance.new("BoxHandleAdornment")
-                    glow.Adornee = part
-                    glow.AlwaysOnTop = true
-                    glow.ZIndex = 5
-                    glow.Size = part.Size + Vector3.new(0.05, 0.05, 0.05)
-                    glow.Transparency = 0.25
-                    glow.Color3 = config.glowColor
-                    glow.Parent = part
+-- ⚙️ ESP
+toggleButton(pages["ESP"], "Glow ESP", config.glowESP, function(v) config.glowESP = v end).Position = UDim2.new(0, 10, 0, 10)
 
-                    local outline = Instance.new("SelectionBox", part)
-                    outline.Adornee = part
-                    outline.LineThickness = 0.04
-                    outline.Color3 = config.outlineColor
-                    outline.SurfaceTransparency = 1
-                end
-            end
-        end
-    end
-end
+-- ⚙️ Misc
+toggleButton(pages["Misc"], "TriggerBot", config.triggerBot, function(v) config.triggerBot = v end).Position = UDim2.new(0, 10, 0, 10)
+toggleButton(pages["Misc"], "NoSpread", config.noSpread, function(v) config.noSpread = v end).Position = UDim2.new(0, 10, 0, 50)
 
--- FOV круг
-local fov = Drawing.new("Circle")
-fov.Thickness = 2
-fov.Radius = config.fov
-fov.Filled = false
-fov.Color = Color3.fromRGB(255, 120, 255)
-fov.Transparency = 0.6
-
-rs.RenderStepped:Connect(function()
-    fov.Position = Vector2.new(mouse.X, mouse.Y + 36)
-    fov.Visible = true
-end)
+-- TODO: Функции Aimbot, TriggerBot, GlowESP подключаются дальше
+-- (Они будут добавлены после подтверждения UI)
