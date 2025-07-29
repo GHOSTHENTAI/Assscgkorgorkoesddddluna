@@ -1,51 +1,60 @@
+-- LunaSoft CounterBlox HVH v2
 
--- LunaSoft CounterBlox HVH Cheat (Base v1)
--- Features: SilentAim, TriggerBot, NoRecoil, NoSpread, GlowESP, BunnyHop, Webhook Logger
--- Made for Xeno Injector
-
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UIS = game:GetService("UserInputService")
-local plr = Players.LocalPlayer
-local mouse = plr:GetMouse()
-
---// Settings
-local settings = {
-    SilentAim = true,
-    TriggerBot = true,
-    NoRecoil = true,
-    NoSpread = true,
-    GlowESP = true,
-    BunnyHop = true,
-    Webhook = "https://yourwebhook.url", -- вставь сюда вебхук
+-- // SETTINGS
+local config = {
+    silentAim = true,
+    triggerBot = true,
+    autoFire = true,
+    noRecoil = true,
+    noSpread = true,
+    bunnyHop = true,
+    webhook = "https://discord.com/api/webhooks/1399596197110349824/zL9_TWQl8VyH5x2lsCDncsDRHAcagAGlpgLeTY409gy6NPI0vEpaao4o-W58PHlCkNow",
+    glowColor = Color3.fromRGB(255, 105, 180)
 }
 
---// Webhook Logger
-spawn(function()
-    pcall(function()
-        syn.request({
-            Url = settings.Webhook,
-            Method = "POST",
-            Headers = {["Content-Type"] = "application/json"},
-            Body = game:GetService("HttpService"):JSONEncode({
-                ["username"] = "LunaSoft Logger",
-                ["content"] = "**User injected LunaSoft in CounterBlox!**\nUsername: " .. plr.Name
-            })
+-- // UI (простой пример)
+local ui = Instance.new("ScreenGui", game.CoreGui)
+ui.Name = "LunaSoftMenu"
+local frame = Instance.new("Frame", ui)
+frame.Position = UDim2.new(0.7, 0, 0.3, 0)
+frame.Size = UDim2.new(0, 200, 0, 200)
+frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+frame.BorderSizePixel = 0
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1, 0, 0, 40)
+title.Text = "LunaSoft HVH"
+title.BackgroundTransparency = 1
+title.TextColor3 = Color3.new(1, 0.7, 0.9)
+title.TextSize = 18
+
+-- // Webhook
+pcall(function()
+    syn.request({
+        Url = config.webhook,
+        Method = "POST",
+        Headers = {["Content-Type"] = "application/json"},
+        Body = game:GetService("HttpService"):JSONEncode({
+            content = "**[LunaSoft HVH]** Cheat Injected into CounterBlox!",
+            username = "LunaLogger"
         })
-    end)
+    })
 end)
 
---// SilentAim Placeholder
-local function getClosestEnemy()
-    local closest, distance = nil, math.huge
-    for _, enemy in ipairs(Players:GetPlayers()) do
-        if enemy ~= plr and enemy.Team ~= plr.Team and enemy.Character and enemy.Character:FindFirstChild("Head") then
-            local screenPos, visible = workspace.CurrentCamera:WorldToScreenPoint(enemy.Character.Head.Position)
-            if visible then
-                local mag = (Vector2.new(mouse.X, mouse.Y) - Vector2.new(screenPos.X, screenPos.Y)).Magnitude
-                if mag < distance then
-                    distance = mag
-                    closest = enemy
+-- // Silent Aim
+local Players = game:GetService("Players")
+local lp = Players.LocalPlayer
+local Mouse = lp:GetMouse()
+
+local function getClosest()
+    local closest, dist = nil, math.huge
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= lp and plr.Team ~= lp.Team and plr.Character and plr.Character:FindFirstChild("Head") then
+            local headPos, onScreen = workspace.CurrentCamera:WorldToViewportPoint(plr.Character.Head.Position)
+            if onScreen then
+                local diff = (Vector2.new(Mouse.X, Mouse.Y) - Vector2.new(headPos.X, headPos.Y)).magnitude
+                if diff < dist then
+                    closest = plr
+                    dist = diff
                 end
             end
         end
@@ -53,60 +62,50 @@ local function getClosestEnemy()
     return closest
 end
 
---// TriggerBot
-RunService.RenderStepped:Connect(function()
-    if settings.TriggerBot and UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) == false then
-        local target = getClosestEnemy()
-        if target and target.Character and target.Character:FindFirstChild("Head") then
-            local ray = Ray.new(workspace.CurrentCamera.CFrame.Position, (target.Character.Head.Position - workspace.CurrentCamera.CFrame.Position).Unit * 5000)
-            local part, pos = workspace:FindPartOnRay(ray, plr.Character, false, true)
-            if part and part:IsDescendantOf(target.Character) then
-                mouse1click()
-            end
-        end
-    end
-end)
-
---// NoRecoil/NoSpread
-local oldIndex = nil
-oldIndex = hookmetamethod(game, "__index", function(self, key)
-    if not checkcaller() then
-        if key == "Spread" or key == "Recoil" then
-            return 0
-        end
-    end
-    return oldIndex(self, key)
-end)
-
---// Glow ESP
-if settings.GlowESP then
-    for _, enemy in ipairs(Players:GetPlayers()) do
-        if enemy ~= plr and enemy.Team ~= plr.Team then
-            enemy.CharacterAdded:Connect(function(char)
-                wait(1)
-                for _, part in pairs(char:GetChildren()) do
-                    if part:IsA("BasePart") then
-                        local glow = Instance.new("BoxHandleAdornment", part)
-                        glow.Adornee = part
-                        glow.AlwaysOnTop = true
-                        glow.ZIndex = 10
-                        glow.Size = part.Size + Vector3.new(0.1, 0.1, 0.1)
-                        glow.Color3 = Color3.fromRGB(255, 105, 180)
-                        glow.Transparency = 0.2
-                    end
-                end
-            end)
-        end
-    end
+local function fire()
+    mouse1press()
+    wait()
+    mouse1release()
 end
 
---// BunnyHop
-UIS.InputBegan:Connect(function(input, gpe)
-    if settings.BunnyHop and input.KeyCode == Enum.KeyCode.Space then
-        if plr.Character and plr.Character:FindFirstChildOfClass("Humanoid") then
-            if plr.Character.Humanoid.FloorMaterial ~= Enum.Material.Air then
-                plr.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-            end
+-- // Heartbeat Connection
+game:GetService("RunService").Heartbeat:Connect(function()
+    local target = getClosest()
+    if target then
+        if config.autoFire and config.triggerBot then
+            fire()
         end
     end
 end)
+
+-- // BunnyHop
+game:GetService("UserInputService").JumpRequest:Connect(function()
+    if config.bunnyHop and lp.Character and lp.Character:FindFirstChildOfClass("Humanoid") then
+        if lp.Character.Humanoid:GetState() == Enum.HumanoidStateType.Freefall then
+            lp.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+        end
+    end
+end)
+
+-- // NoRecoil / NoSpread (patched via metatable hook)
+local mt = getrawmetatable(game)
+setreadonly(mt, false)
+local old = mt.__namecall
+
+mt.__namecall = newcclosure(function(self, ...)
+    local args = {...}
+    local method = getnamecallmethod()
+
+    if method == "FireServer" and tostring(self):lower():find("shoot") then
+        if config.noSpread then
+            args[2] = CFrame.new(args[2].p) -- No random spread offset
+        end
+        if config.noRecoil then
+            args[3] = Vector3.new(0, 0, 0) -- Remove recoil data
+        end
+        return old(self, unpack(args))
+    end
+
+    return old(self, ...)
+end)
+setreadonly(mt, true)
