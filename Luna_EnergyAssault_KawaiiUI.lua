@@ -1,55 +1,57 @@
 
--- 🌸 LunaSoft Kawaii Aim v1.1 for Energy Assault
+-- 🌸 LunaSilent v2.0 for Energy Assault (Xeno Compatible)
 -- Автор: Кира 💗
 
--- 🌸 Настройки
+-- Настройки
 local config = {
     fov = 80,
     aimBind = Enum.UserInputType.MouseButton2, -- ПКМ
     teamCheck = true,
     deadCheck = true,
     wallCheck = true,
-    esp = true,
+    silentAim = true,
+    glowESP = true,
     glowColor = Color3.fromRGB(255, 150, 255),
     outlineColor = Color3.fromRGB(255, 255, 255)
 }
 
--- 🌸 Службы
+-- Службы
 local plr = game.Players.LocalPlayer
 local mouse = plr:GetMouse()
 local cam = workspace.CurrentCamera
 local rs = game:GetService("RunService")
 local uis = game:GetService("UserInputService")
 
--- 🌸 UI
+-- UI
 local ui = Instance.new("ScreenGui", game.CoreGui)
-ui.Name = "🌸LunaCuteUI"
+ui.Name = "LunaSilentUI"
 local frame = Instance.new("Frame", ui)
-frame.Size = UDim2.new(0, 350, 0, 250)
+frame.Size = UDim2.new(0, 350, 0, 270)
 frame.Position = UDim2.new(0.65, 0, 0.2, 0)
-frame.BackgroundColor3 = Color3.fromRGB(255, 230, 255)
+frame.BackgroundColor3 = Color3.fromRGB(245, 215, 255)
 frame.Active = true
 frame.Draggable = true
 frame.BorderSizePixel = 0
 
 local title = Instance.new("TextLabel", frame)
 title.Size = UDim2.new(1, 0, 0, 30)
-title.Text = "🌸 LunaSoft Kawaii Menu 🌸"
+title.Text = "🌸 LunaSilent v2.0"
 title.BackgroundColor3 = Color3.fromRGB(255, 180, 255)
 title.TextColor3 = Color3.new(1,1,1)
-title.Font = Enum.Font.Fantasy
+title.Font = Enum.Font.GothamBold
 title.TextSize = 20
 
--- 🌸 Создание переключателей
-local function toggleBtn(name, y, state, callback)
+-- Кнопки
+local function makeToggle(name, y, default, callback)
     local btn = Instance.new("TextButton", frame)
     btn.Position = UDim2.new(0, 10, 0, y)
     btn.Size = UDim2.new(0, 330, 0, 30)
     btn.BackgroundColor3 = Color3.fromRGB(255, 200, 255)
-    btn.Text = (state and "[ON] " or "[OFF] ") .. name
+    btn.Text = (default and "[ON] " or "[OFF] ") .. name
     btn.TextColor3 = Color3.new(1,1,1)
     btn.Font = Enum.Font.Cartoon
     btn.TextSize = 16
+    local state = default
     btn.MouseButton1Click:Connect(function()
         state = not state
         btn.Text = (state and "[ON] " or "[OFF] ") .. name
@@ -57,10 +59,11 @@ local function toggleBtn(name, y, state, callback)
     end)
 end
 
--- 🌸 Aimbot логика
+-- Aimbot функции
 local aiming = false
-local function isAlive(player)
-    local h = player.Character and player.Character:FindFirstChildWhichIsA("Humanoid")
+
+local function isAlive(p)
+    local h = p.Character and p.Character:FindFirstChildWhichIsA("Humanoid")
     return h and h.Health > 0
 end
 
@@ -70,7 +73,7 @@ local function isVisible(pos)
     return not hit or hit.Transparency > 0.3
 end
 
-local function getClosest()
+local function getTarget()
     local closest, dist = nil, config.fov
     for _, v in pairs(game.Players:GetPlayers()) do
         if v ~= plr and v.Character and v.Character:FindFirstChild("Head") then
@@ -88,17 +91,25 @@ local function getClosest()
     return closest
 end
 
--- 🌸 Aimbot Loop
-rs.RenderStepped:Connect(function()
-    if aiming then
-        local target = getClosest()
+-- Silent Aim Hook
+local mt = getrawmetatable(game)
+setreadonly(mt, false)
+local oldNamecall = mt.__namecall
+mt.__namecall = newcclosure(function(self, ...)
+    local args = {...}
+    local method = getnamecallmethod()
+    if config.silentAim and aiming and method == "FindPartOnRayWithIgnoreList" then
+        local target = getTarget()
         if target and target.Character and target.Character:FindFirstChild("Head") then
             local head = target.Character.Head.Position
-            cam.CFrame = cam.CFrame:Lerp(CFrame.new(cam.CFrame.Position, head), 0.12)
+            args[1] = Ray.new(cam.CFrame.Position, (head - cam.CFrame.Position).Unit * 999)
+            return oldNamecall(self, unpack(args))
         end
     end
+    return oldNamecall(self, ...)
 end)
 
+-- Ввод
 uis.InputBegan:Connect(function(i)
     if i.UserInputType == config.aimBind then aiming = true end
 end)
@@ -106,8 +117,8 @@ uis.InputEnded:Connect(function(i)
     if i.UserInputType == config.aimBind then aiming = false end
 end)
 
--- 🌸 ESP
-if config.esp then
+-- Glow ESP
+if config.glowESP then
     for _, player in ipairs(game.Players:GetPlayers()) do
         if player ~= plr and player.Team ~= plr.Team then
             local chr = player.Character or player.CharacterAdded:Wait()
@@ -118,13 +129,13 @@ if config.esp then
                     glow.AlwaysOnTop = true
                     glow.ZIndex = 5
                     glow.Size = part.Size + Vector3.new(0.05, 0.05, 0.05)
-                    glow.Transparency = 0.2
+                    glow.Transparency = 0.25
                     glow.Color3 = config.glowColor
                     glow.Parent = part
 
                     local outline = Instance.new("SelectionBox", part)
                     outline.Adornee = part
-                    outline.LineThickness = 0.03
+                    outline.LineThickness = 0.04
                     outline.Color3 = config.outlineColor
                     outline.SurfaceTransparency = 1
                 end
@@ -133,14 +144,15 @@ if config.esp then
     end
 end
 
--- 🌸 FOV круг
-local circle = Drawing.new("Circle")
-circle.Radius = config.fov
-circle.Thickness = 1.5
-circle.Filled = false
-circle.Color = Color3.fromRGB(255, 150, 255)
-circle.Transparency = 0.5
+-- FOV круг
+local fov = Drawing.new("Circle")
+fov.Thickness = 2
+fov.Radius = config.fov
+fov.Filled = false
+fov.Color = Color3.fromRGB(255, 120, 255)
+fov.Transparency = 0.6
+
 rs.RenderStepped:Connect(function()
-    circle.Position = Vector2.new(mouse.X, mouse.Y + 36)
-    circle.Visible = true
+    fov.Position = Vector2.new(mouse.X, mouse.Y + 36)
+    fov.Visible = true
 end)
