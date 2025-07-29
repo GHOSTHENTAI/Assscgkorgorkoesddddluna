@@ -1,68 +1,70 @@
+-- LunaSoft CounterBlox [BETA BASE]
+-- Works with Xeno Injector
+-- Toggle Menu: RightShift
 
--- LunaSoft CounterBlox HVH Internal | Xeno Supported
-
-if not game:IsLoaded() then game.Loaded:Wait() end
-
---// Services
+local UIS = game:GetService("UserInputService")
 local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
-local StarterGui = game:GetService("StarterGui")
+local LP = Players.LocalPlayer
 
-local lp = Players.LocalPlayer
-local mouse = lp:GetMouse()
+local ESP = {}
+local ToggleMenu = false
 
---// Notification
-pcall(function()
-    StarterGui:SetCore("SendNotification", {
-        Title = "LunaSoft HVH",
-        Text = "Cheat Loaded Successfully! Press RightShift to toggle menu.",
-        Duration = 5
-    })
-end)
+-- UI Placeholder
+local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
+local Frame = Instance.new("Frame", ScreenGui)
+Frame.Position = UDim2.new(0.3, 0, 0.3, 0)
+Frame.Size = UDim2.new(0, 300, 0, 200)
+Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Frame.Visible = false
 
---// UI Setup
-local gui = Instance.new("ScreenGui", game.CoreGui)
-gui.Name = "LunaSoftUI"
-
-local menuOpen = false
-local frame = Instance.new("Frame", gui)
-frame.Size = UDim2.new(0, 400, 0, 300)
-frame.Position = UDim2.new(0.5, -200, 0.5, -150)
-frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-frame.BorderSizePixel = 0
-frame.Visible = false
-
--- Menu Toggle
-UserInputService.InputBegan:Connect(function(input, gpe)
-    if not gpe and input.KeyCode == Enum.KeyCode.RightShift then
-        menuOpen = not menuOpen
-        frame.Visible = menuOpen
+-- Toggle UI
+UIS.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.KeyCode == Enum.KeyCode.RightShift then
+        ToggleMenu = not ToggleMenu
+        Frame.Visible = ToggleMenu
     end
 end)
 
---// ESP Example (Safe)
-local function createESP(plr)
-    if plr == lp or not plr.Character or not plr.Character:FindFirstChild("Head") then return end
-    local esp = Instance.new("BillboardGui", plr.Character.Head)
-    esp.Name = "LunaESP"
-    esp.Size = UDim2.new(4,0, 1,0)
-    esp.AlwaysOnTop = true
+-- ESP
+local function CreateESP(plr)
+    if plr == LP or plr.Team == LP.Team then return end
+    local box = Drawing.new("Text")
+    box.Size = 18
+    box.Center = true
+    box.Outline = true
+    box.Color = Color3.new(1, 1, 1)
+    box.Visible = false
+    ESP[plr] = box
 
-    local name = Instance.new("TextLabel", esp)
-    name.Size = UDim2.new(1,0,1,0)
-    name.Text = plr.Name
-    name.TextColor3 = Color3.new(1, 0.2, 0.5)
-    name.BackgroundTransparency = 1
-end
+    RunService.RenderStepped:Connect(function()
+        if not plr.Character or not plr.Character:FindFirstChild("Head") then
+            box.Visible = false
+            return
+        end
 
-for _, p in pairs(Players:GetPlayers()) do
-    if p ~= lp then createESP(p) end
-end
-
-Players.PlayerAdded:Connect(function(p)
-    p.CharacterAdded:Connect(function()
-        wait(1)
-        createESP(p)
+        local head = plr.Character.Head
+        local pos, onScreen = workspace.CurrentCamera:WorldToViewportPoint(head.Position)
+        if onScreen then
+            box.Position = Vector2.new(pos.X, pos.Y - 25)
+            box.Text = plr.Name
+            box.Visible = true
+        else
+            box.Visible = false
+        end
     end)
-end)
+end
+
+for _, plr in ipairs(Players:GetPlayers()) do
+    CreateESP(plr)
+end
+
+Players.PlayerAdded:Connect(CreateESP)
+
+-- Injected Confirmation (You can replace with Webhook)
+game.StarterGui:SetCore("SendNotification", {
+    Title = "LunaSoft",
+    Text = "CounterBlox cheat injected!",
+    Duration = 5
+})
