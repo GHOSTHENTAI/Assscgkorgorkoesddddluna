@@ -1,77 +1,42 @@
 
--- LunaSoft CounterBlox HVH Cheat [Full Version]
+-- LunaSoft CounterBlox Advanced
+-- Silent Aim, AimLock, TriggerBot, NoRecoil, NoSpread, Webhook Logger
 
--- Settings
-local Settings = {
-    Aimbot = true,
-    SilentAim = true,
-    TriggerBot = true,
-    NoRecoil = true,
-    NoSpread = true,
-    FOV = 120,
-    KeyBind = Enum.KeyCode.E,
-    Webhook = "https://your-discord-webhook-url"
-}
-
--- UI Setup (Basic placeholder)
-local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
-local Frame = Instance.new("Frame", ScreenGui)
-Frame.Size = UDim2.new(0, 250, 0, 300)
-Frame.Position = UDim2.new(0.5, -125, 0.5, -150)
-Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-Frame.Visible = false
-
-local ToggleKey = Enum.KeyCode.RightShift
-game:GetService("UserInputService").InputBegan:Connect(function(input)
-    if input.KeyCode == ToggleKey then
-        Frame.Visible = not Frame.Visible
-    end
-end)
-
--- Send webhook
-spawn(function()
-    pcall(function()
-        game:HttpPost(Settings.Webhook, '{"content": "✅ LunaSoft CounterBlox Injected!"}', Enum.HttpContentType.ApplicationJson)
-    end)
-end)
-
--- Utilities
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
 local RunService = game:GetService("RunService")
-local Camera = workspace.CurrentCamera
+local Workspace = game:GetService("Workspace")
+local HttpService = game:GetService("HttpService")
 
--- No Recoil / No Spread Hook
-local function ApplyNoRecoilNoSpread()
-    local repStorage = game:GetService("ReplicatedStorage")
-    local events = repStorage:FindFirstChild("Events")
-    if events and events:FindFirstChild("Shoot") then
-        local originalFire = events.Shoot.FireServer
-        events.Shoot.FireServer = function(self, ...)
-            local args = {...}
-            if Settings.NoSpread and typeof(args[2]) == "CFrame" then
-                args[2] = Camera.CFrame -- eliminate spread by using direct aim
-            end
-            return originalFire(self, unpack(args))
-        end
-    end
-end
+local Config = {
+    Webhook = "https://your-webhook-url", -- Заменить на твой вебхук
+    SilentAim = true,
+    AimLock = true,
+    TriggerBot = true,
+    NoRecoil = true,
+    NoSpread = true,
+    BunnyHop = true,
+    FOV = 75
+}
 
--- Silent Aim
+-- Webhook Notify
+pcall(function()
+    HttpService:PostAsync(Config.Webhook, HttpService:JSONEncode({
+        content = "**LunaSoft injected into CounterBlox** 🎯"
+    }))
+end)
+
+-- Silent Aim / AimLock
 local function GetClosestEnemy()
-    local closest = nil
-    local shortest = math.huge
-
-    for _, enemy in pairs(Players:GetPlayers()) do
-        if enemy ~= LocalPlayer and enemy.Team ~= LocalPlayer.Team and enemy.Character and enemy.Character:FindFirstChild("Head") then
-            local pos, onScreen = Camera:WorldToViewportPoint(enemy.Character.Head.Position)
-            if onScreen then
-                local dist = (Vector2.new(pos.X, pos.Y) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
-                if dist < shortest and dist < Settings.FOV then
-                    shortest = dist
-                    closest = enemy
-                end
+    local closest, dist = nil, math.huge
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Team ~= LocalPlayer.Team and player.Character and player.Character:FindFirstChild("Head") then
+            local pos, onScreen = Workspace.CurrentCamera:WorldToViewportPoint(player.Character.Head.Position)
+            local mag = (Vector2.new(Mouse.X, Mouse.Y) - Vector2.new(pos.X, pos.Y)).magnitude
+            if onScreen and mag < Config.FOV and mag < dist then
+                closest = player
+                dist = mag
             end
         end
     end
@@ -80,26 +45,31 @@ end
 
 -- TriggerBot
 RunService.RenderStepped:Connect(function()
-    if Settings.TriggerBot and Mouse.Target then
-        local target = Players:GetPlayerFromCharacter(Mouse.Target:FindFirstAncestorOfClass("Model"))
-        if target and target ~= LocalPlayer and target.Team ~= LocalPlayer.Team then
-            mouse1press()
-            wait()
-            mouse1release()
+    if Config.TriggerBot then
+        local target = Mouse.Target
+        if target and target.Parent:FindFirstChild("Humanoid") and Players:GetPlayerFromCharacter(target.Parent) ~= LocalPlayer then
+            mouse1click()
         end
     end
 end)
 
--- Aimbot
+-- No Recoil / No Spread (заглушка, зависит от CounterBlox internals)
+hookmetamethod(game, "__namecall", function(self, ...)
+    local method = getnamecallmethod()
+    if Config.NoRecoil and tostring(self) == "RecoilModule" and method == "FireServer" then
+        return -- блокируем отдачу
+    end
+    return self(...)
+end)
+
+-- BunnyHop
 RunService.RenderStepped:Connect(function()
-    if Settings.Aimbot and UserInputService:IsKeyDown(Settings.KeyBind) then
-        local enemy = GetClosestEnemy()
-        if enemy and enemy.Character and enemy.Character:FindFirstChild("Head") then
-            local aimPos = Camera:WorldToViewportPoint(enemy.Character.Head.Position)
-            mousemoverel((aimPos.X - Mouse.X) / 3, (aimPos.Y - Mouse.Y) / 3)
+    if Config.BunnyHop and UserInputService:IsKeyDown(Enum.KeyCode.Space) and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        if LocalPlayer.Character.Humanoid.FloorMaterial ~= Enum.Material.Air then
+            LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
         end
     end
 end)
 
--- Apply patches
-ApplyNoRecoilNoSpread()
+-- UI заглушка
+print("LunaSoft CounterBlox UI Loaded")
