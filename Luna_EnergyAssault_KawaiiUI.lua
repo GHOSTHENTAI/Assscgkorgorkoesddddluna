@@ -1,94 +1,51 @@
---[[
-    CounterBlox Base Cheat (Xeno Compatible)
-    Features: Silent Aim, TriggerBot, NoRecoil, NoSpread, BunnyHop, Webhook Logger
-]]--
 
--- Settings
-local config = {
-    silentAim = true,
-    triggerBot = true,
-    noRecoil = true,
-    noSpread = true,
-    bunnyHop = true,
-    webhookLogging = true,
-    webhookURL = "https://your.webhook.url.here",
-    aimPart = "Head",
-    fov = 150,
-    triggerKey = Enum.UserInputType.MouseButton2,
-    toggleKey = Enum.KeyCode.RightShift
-}
+-- LunaSoft CounterBlox HVH Cheat (Base v1)
+-- Features: SilentAim, TriggerBot, NoRecoil, NoSpread, GlowESP, BunnyHop, Webhook Logger
+-- Made for Xeno Injector
 
--- Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
 local plr = Players.LocalPlayer
 local mouse = plr:GetMouse()
-local camera = workspace.CurrentCamera
 
--- State
-local enabled = true
-local jumping = false
+--// Settings
+local settings = {
+    SilentAim = true,
+    TriggerBot = true,
+    NoRecoil = true,
+    NoSpread = true,
+    GlowESP = true,
+    BunnyHop = true,
+    Webhook = "https://yourwebhook.url", -- вставь сюда вебхук
+}
 
--- UI (Basic Notification)
-local function notify(txt)
-    game.StarterGui:SetCore("SendNotification", {
-        Title = "CounterBlox Xeno Cheat",
-        Text = txt,
-        Duration = 4
-    })
-end
-
--- Webhook Logger
-if config.webhookLogging and syn then
-    syn.request({
-        Url = config.webhookURL,
-        Method = "POST",
-        Headers = {["Content-Type"] = "application/json"},
-        Body = game:GetService("HttpService"):JSONEncode({
-            content = "**User attached script in CounterBlox.**",
-            embeds = {{
-                title = "CounterBlox Logger",
-                description = "Injected cheat with settings.",
-                color = 16711900
-            }}
+--// Webhook Logger
+spawn(function()
+    pcall(function()
+        syn.request({
+            Url = settings.Webhook,
+            Method = "POST",
+            Headers = {["Content-Type"] = "application/json"},
+            Body = game:GetService("HttpService"):JSONEncode({
+                ["username"] = "LunaSoft Logger",
+                ["content"] = "**User injected LunaSoft in CounterBlox!**\nUsername: " .. plr.Name
+            })
         })
-    })
-end
-
--- BunnyHop
-UIS.InputBegan:Connect(function(input)
-    if input.KeyCode == Enum.KeyCode.Space then
-        jumping = true
-    end
+    end)
 end)
 
-UIS.InputEnded:Connect(function(input)
-    if input.KeyCode == Enum.KeyCode.Space then
-        jumping = false
-    end
-end)
-
-RunService.RenderStepped:Connect(function()
-    if config.bunnyHop and jumping and plr.Character and plr.Character:FindFirstChild("Humanoid") then
-        local humanoid = plr.Character.Humanoid
-        if humanoid:GetState() == Enum.HumanoidStateType.Running then
-            humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-        end
-    end
-end)
-
--- Silent Aim & TriggerBot
-local function getClosestPlayer()
-    local closest, distance = nil, config.fov
-    for _, v in pairs(Players:GetPlayers()) do
-        if v ~= plr and v.Team ~= plr.Team and v.Character and v.Character:FindFirstChild(config.aimPart) then
-            local screenPoint, onScreen = camera:WorldToViewportPoint(v.Character[config.aimPart].Position)
-            if onScreen then
-                local mag = (Vector2.new(mouse.X, mouse.Y) - Vector2.new(screenPoint.X, screenPoint.Y)).magnitude
+--// SilentAim Placeholder
+local function getClosestEnemy()
+    local closest, distance = nil, math.huge
+    for _, enemy in ipairs(Players:GetPlayers()) do
+        if enemy ~= plr and enemy.Team ~= plr.Team and enemy.Character and enemy.Character:FindFirstChild("Head") then
+            local screenPos, visible = workspace.CurrentCamera:WorldToScreenPoint(enemy.Character.Head.Position)
+            if visible then
+                local mag = (Vector2.new(mouse.X, mouse.Y) - Vector2.new(screenPos.X, screenPos.Y)).Magnitude
                 if mag < distance then
                     distance = mag
-                    closest = v
+                    closest = enemy
                 end
             end
         end
@@ -96,40 +53,60 @@ local function getClosestPlayer()
     return closest
 end
 
--- Hook
-local __namecall
-__namecall = hookmetamethod(game, "__namecall", function(self, ...)
-    local method = getnamecallmethod()
-    if enabled and config.silentAim and method == "FindPartOnRayWithIgnoreList" then
-        local target = getClosestPlayer()
-        if target and target.Character then
-            local part = target.Character:FindFirstChild(config.aimPart)
-            if part then
-                local origin = camera.CFrame.Position
-                local direction = (part.Position - origin).unit * 1000
-                local ray = Ray.new(origin, direction)
-                return game.Workspace:FindPartOnRayWithIgnoreList(ray, {...})
+--// TriggerBot
+RunService.RenderStepped:Connect(function()
+    if settings.TriggerBot and UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) == false then
+        local target = getClosestEnemy()
+        if target and target.Character and target.Character:FindFirstChild("Head") then
+            local ray = Ray.new(workspace.CurrentCamera.CFrame.Position, (target.Character.Head.Position - workspace.CurrentCamera.CFrame.Position).Unit * 5000)
+            local part, pos = workspace:FindPartOnRay(ray, plr.Character, false, true)
+            if part and part:IsDescendantOf(target.Character) then
+                mouse1click()
             end
         end
     end
-    return __namecall(self, ...)
 end)
 
--- TriggerBot
-RunService.RenderStepped:Connect(function()
-    if config.triggerBot and UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then return end
-    local target = mouse.Target
-    if target and target.Parent and Players:GetPlayerFromCharacter(target.Parent) then
-        mouse1click()
+--// NoRecoil/NoSpread
+local oldIndex = nil
+oldIndex = hookmetamethod(game, "__index", function(self, key)
+    if not checkcaller() then
+        if key == "Spread" or key == "Recoil" then
+            return 0
+        end
     end
+    return oldIndex(self, key)
 end)
 
--- Toggle UI (placeholder)
+--// Glow ESP
+if settings.GlowESP then
+    for _, enemy in ipairs(Players:GetPlayers()) do
+        if enemy ~= plr and enemy.Team ~= plr.Team then
+            enemy.CharacterAdded:Connect(function(char)
+                wait(1)
+                for _, part in pairs(char:GetChildren()) do
+                    if part:IsA("BasePart") then
+                        local glow = Instance.new("BoxHandleAdornment", part)
+                        glow.Adornee = part
+                        glow.AlwaysOnTop = true
+                        glow.ZIndex = 10
+                        glow.Size = part.Size + Vector3.new(0.1, 0.1, 0.1)
+                        glow.Color3 = Color3.fromRGB(255, 105, 180)
+                        glow.Transparency = 0.2
+                    end
+                end
+            end)
+        end
+    end
+end
+
+--// BunnyHop
 UIS.InputBegan:Connect(function(input, gpe)
-    if not gpe and input.KeyCode == config.toggleKey then
-        enabled = not enabled
-        notify("Cheat " .. (enabled and "Enabled" or "Disabled"))
+    if settings.BunnyHop and input.KeyCode == Enum.KeyCode.Space then
+        if plr.Character and plr.Character:FindFirstChildOfClass("Humanoid") then
+            if plr.Character.Humanoid.FloorMaterial ~= Enum.Material.Air then
+                plr.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+            end
+        end
     end
 end)
-
-notify("Cheat Loaded.")
