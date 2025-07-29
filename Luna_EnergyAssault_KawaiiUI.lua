@@ -1,70 +1,105 @@
--- LunaSoft CounterBlox [BETA BASE]
--- Works with Xeno Injector
--- Toggle Menu: RightShift
 
-local UIS = game:GetService("UserInputService")
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local LP = Players.LocalPlayer
+-- LunaSoft CounterBlox HVH Cheat [Full Version]
 
-local ESP = {}
-local ToggleMenu = false
+-- Settings
+local Settings = {
+    Aimbot = true,
+    SilentAim = true,
+    TriggerBot = true,
+    NoRecoil = true,
+    NoSpread = true,
+    FOV = 120,
+    KeyBind = Enum.KeyCode.E,
+    Webhook = "https://your-discord-webhook-url"
+}
 
--- UI Placeholder
+-- UI Setup (Basic placeholder)
 local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
 local Frame = Instance.new("Frame", ScreenGui)
-Frame.Position = UDim2.new(0.3, 0, 0.3, 0)
-Frame.Size = UDim2.new(0, 300, 0, 200)
-Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Frame.Size = UDim2.new(0, 250, 0, 300)
+Frame.Position = UDim2.new(0.5, -125, 0.5, -150)
+Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 Frame.Visible = false
 
--- Toggle UI
-UIS.InputBegan:Connect(function(input, gp)
-    if gp then return end
-    if input.KeyCode == Enum.KeyCode.RightShift then
-        ToggleMenu = not ToggleMenu
-        Frame.Visible = ToggleMenu
+local ToggleKey = Enum.KeyCode.RightShift
+game:GetService("UserInputService").InputBegan:Connect(function(input)
+    if input.KeyCode == ToggleKey then
+        Frame.Visible = not Frame.Visible
     end
 end)
 
--- ESP
-local function CreateESP(plr)
-    if plr == LP or plr.Team == LP.Team then return end
-    local box = Drawing.new("Text")
-    box.Size = 18
-    box.Center = true
-    box.Outline = true
-    box.Color = Color3.new(1, 1, 1)
-    box.Visible = false
-    ESP[plr] = box
-
-    RunService.RenderStepped:Connect(function()
-        if not plr.Character or not plr.Character:FindFirstChild("Head") then
-            box.Visible = false
-            return
-        end
-
-        local head = plr.Character.Head
-        local pos, onScreen = workspace.CurrentCamera:WorldToViewportPoint(head.Position)
-        if onScreen then
-            box.Position = Vector2.new(pos.X, pos.Y - 25)
-            box.Text = plr.Name
-            box.Visible = true
-        else
-            box.Visible = false
-        end
+-- Send webhook
+spawn(function()
+    pcall(function()
+        game:HttpPost(Settings.Webhook, '{"content": "✅ LunaSoft CounterBlox Injected!"}', Enum.HttpContentType.ApplicationJson)
     end)
+end)
+
+-- Utilities
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
+local RunService = game:GetService("RunService")
+local Camera = workspace.CurrentCamera
+
+-- No Recoil / No Spread Hook
+local function ApplyNoRecoilNoSpread()
+    local repStorage = game:GetService("ReplicatedStorage")
+    local events = repStorage:FindFirstChild("Events")
+    if events and events:FindFirstChild("Shoot") then
+        local originalFire = events.Shoot.FireServer
+        events.Shoot.FireServer = function(self, ...)
+            local args = {...}
+            if Settings.NoSpread and typeof(args[2]) == "CFrame" then
+                args[2] = Camera.CFrame -- eliminate spread by using direct aim
+            end
+            return originalFire(self, unpack(args))
+        end
+    end
 end
 
-for _, plr in ipairs(Players:GetPlayers()) do
-    CreateESP(plr)
+-- Silent Aim
+local function GetClosestEnemy()
+    local closest = nil
+    local shortest = math.huge
+
+    for _, enemy in pairs(Players:GetPlayers()) do
+        if enemy ~= LocalPlayer and enemy.Team ~= LocalPlayer.Team and enemy.Character and enemy.Character:FindFirstChild("Head") then
+            local pos, onScreen = Camera:WorldToViewportPoint(enemy.Character.Head.Position)
+            if onScreen then
+                local dist = (Vector2.new(pos.X, pos.Y) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
+                if dist < shortest and dist < Settings.FOV then
+                    shortest = dist
+                    closest = enemy
+                end
+            end
+        end
+    end
+    return closest
 end
 
-Players.PlayerAdded:Connect(CreateESP)
+-- TriggerBot
+RunService.RenderStepped:Connect(function()
+    if Settings.TriggerBot and Mouse.Target then
+        local target = Players:GetPlayerFromCharacter(Mouse.Target:FindFirstAncestorOfClass("Model"))
+        if target and target ~= LocalPlayer and target.Team ~= LocalPlayer.Team then
+            mouse1press()
+            wait()
+            mouse1release()
+        end
+    end
+end)
 
--- Injected Confirmation (You can replace with Webhook)
-game.StarterGui:SetCore("SendNotification", {
-    Title = "LunaSoft",
-    Text = "CounterBlox cheat injected!",
-    Duration = 5
-})
+-- Aimbot
+RunService.RenderStepped:Connect(function()
+    if Settings.Aimbot and UserInputService:IsKeyDown(Settings.KeyBind) then
+        local enemy = GetClosestEnemy()
+        if enemy and enemy.Character and enemy.Character:FindFirstChild("Head") then
+            local aimPos = Camera:WorldToViewportPoint(enemy.Character.Head.Position)
+            mousemoverel((aimPos.X - Mouse.X) / 3, (aimPos.Y - Mouse.Y) / 3)
+        end
+    end
+end)
+
+-- Apply patches
+ApplyNoRecoilNoSpread()
